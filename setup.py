@@ -10,4 +10,4 @@ setup(
         'numpy',     # Exemples de dépendances
     ],
 )
-set
+
