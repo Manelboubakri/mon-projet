@@ -1,80 +1,92 @@
 from flask import Flask, request, jsonify
 from groq import Groq
-import os
 from flasgger import Swagger
-
-# Initialiser Flask
-app = Flask(__name__)
-
-# Initialiser Swagger pour la documentation de l'API
-swagger = Swagger(app)
+import os
+import subprocess
+import re  # Pour extraire uniquement la commande Git
 
 # Définir la clé API Groq
-api_key = "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"  # Remplacez par votre clé API Groq
+api_key = "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"
 os.environ["GROQ_API_KEY"] = api_key
 
-# Créer un client Groq
+# Initialiser Flask et Swagger
+app = Flask(__name__)
+swagger = Swagger(app)
+
+# Initialiser Groq Client
 client = Groq(api_key=api_key)
 
-@app.route('/generate_git_command', methods=['POST'])
-def generate_git_command():
+@app.route('/execute_git_command', methods=['POST'])
+def execute_git_command():
     """
-    Cette fonction prend une requête utilisateur et génère une commande Git à l'aide du modèle Groq.
+    Génére et exécute une commande Git à partir d'une description naturelle.
     ---
     parameters:
       - name: prompt
         in: body
-        type: string
         required: true
-        description: La description de l'action Git à générer (par exemple, "Cloner un dépôt GitHub")
+        schema:
+          type: object
+          properties:
+            prompt:
+              type: string
+              example: "Initialiser un dépôt Git"
     responses:
       200:
-        description: La commande Git générée par le modèle Groq
+        description: Résultat de l'exécution de la commande
         schema:
           type: object
           properties:
-            response:
+            command:
               type: string
-              example: "git clone https://github.com/username/repository.git"
+              example: "git init"
+            output:
+              type: string
+              example: "Initialized empty Git repository in ..."
       400:
-        description: Mauvaise requête, le champ 'prompt' est requis
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "Le champ 'prompt' est requis"
+        description: Mauvaise requête
       500:
-        description: Erreur interne du serveur
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "Erreur du serveur"
+        description: Erreur interne
     """
     try:
-        # Récupérer les données JSON envoyées par le client
         data = request.get_json()
-        user_prompt = data.get("prompt", "")
+        prompt = data.get("prompt")
 
-        if not user_prompt:
+        if not prompt:
             return jsonify({"error": "Le champ 'prompt' est requis"}), 400
 
-        # Envoi de la requête au modèle pour générer la commande Git
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": f"Génère une commande Git pour : {user_prompt}"}],
-            model="llama-3.3-70b-versatile"
+        # Générer la commande Git via Groq
+        chat_completion = client.chat.completions.create(
+            messages=[{
+                "role": "user",
+                "content": f"Réponds uniquement par une commande Git sans explication pour : {prompt}"
+            }],
+            model="llama3-70b-8192"
         )
 
-        # Récupérer la réponse du modèle
-        model_response = response.choices[0].message.content
+        response_text = chat_completion.choices[0].message.content.strip()
 
-        return jsonify({"response": model_response})
+        # Extraire la commande Git (ex : "git init")
+        match = re.search(r"(git [^\n\r`]*)", response_text)
+        if not match:
+            return jsonify({
+                "raw_response": response_text,
+                "error": "Aucune commande Git valide trouvée dans la réponse."
+            }), 500
+
+        git_command = match.group(1)
+
+        # Exécuter la commande Git localement
+        result = subprocess.run(git_command, shell=True, capture_output=True, text=True)
+
+        return jsonify({
+            "command": git_command,
+            "output": result.stdout or result.stderr
+        })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Erreur du serveur : {str(e)}"}), 500
 
-# Démarrer l'API Flask
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5004, debug=True)
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=6970, debug=True)
+

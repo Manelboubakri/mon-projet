@@ -13,7 +13,7 @@ client = Groq(api_key=api_key)
 def generate_response(prompt):
     chat_completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="deepseek-r1-distill-qwen-32b",
+        model="llama-3.3-70b-versatile",
     )
     return chat_completion.choices[0].message.content
 

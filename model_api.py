@@ -1,31 +1,52 @@
+# model_api.py
+
 from fastapi import FastAPI
 from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+import os
+from groq import Groq
 
+# Créer l'application FastAPI
 app = FastAPI()
 
-# Charger le modèle localement
-model_path = r"C:\Users\USER\Downloads\codegen_project\codegen_model"
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(model_path)
+# ===========================
+# 🔧 Configurer la clé API et client Groq
+# ===========================
+# Définir ta clé API (Assurez-vous que cette clé est bien protégée)
+api_key = "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"  # ⚠️ Attention à la confidentialité
 
-# Forcer l'utilisation du CPU
-device = torch.device("cpu")
-model.to(device)
+# Définir la clé API dans l'environnement
+os.environ["GROQ_API_KEY"] = api_key
 
-# Définir le format des requêtes
+# Créer une instance du client Groq
+client = Groq(api_key=api_key)
+
+# ===========================
+# 💻 Définir le format des requêtes
+# ===========================
 class CodeRequest(BaseModel):
     comment: str
 
+# ===========================
+# 🚀 Endpoint pour générer du code
+# ===========================
 @app.post("/generate_code")
 def generate_code(request: CodeRequest):
-    inputs = tokenizer(request.comment, return_tensors="pt").to(device)
-    outputs = model.generate(**inputs, max_length=150)
-    code = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return {"generated_code": code}
+    # Créer la requête au modèle Groq
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {"role": "user", "content": request.comment}
+        ],
+        model="llama-3.3-70b-versatile",  # Modèle de génération de code
+    )
 
+    # Récupérer le code généré
+    generated_code = chat_completion.choices[0].message.content.strip()
+
+    return {"generated_code": generated_code}
+
+# ===========================
+# 🚀 Lancer le serveur si le script est exécuté directement
+# ===========================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)  # Port modifié à 8000
-    
+    uvicorn.run(app, host="0.0.0.0", port=8111)  # Lancer le serveur sur le port 8000

@@ -1,25 +1,29 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
 
-# Remplace par le chemin vers ton dossier contenant les fichiers du modèle
-model_path = r"C:\Users\USER\Downloads\codegen_project\codegen_model"
+# Importer les bibliothèques nécessaires
+import os
+from groq import Groq
 
-# Charger le tokenizer et le modèle à partir du dossier
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(model_path)
+# Définir ta clé API
+api_key = "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"  # ⚠️ Attention à la confidentialité
 
-# S'assurer que le modèle utilise le CPU
-device = torch.device("cpu")
-model.to(device)
+# Définir la clé API dans l'environnement
+os.environ["GROQ_API_KEY"] = api_key
 
-def generate_code(comment: str) -> str:
-    inputs = tokenizer(comment, return_tensors="pt").to(device)
-    outputs = model.generate(**inputs, max_length=150)  # Ajuste la longueur max si nécessaire
-    code = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return code
+# Créer une instance du client
+client = Groq(api_key=api_key)
 
-# Test rapide
-if __name__ == "__main__":
-    prompt = "Créer une fonction qui vérifie si un nombre est premier en Python."
-    generated_code = generate_code(prompt)
-    print("Code généré :\n", generated_code)
+# === Ton commentaire (description de la tâche à faire) ===
+description = "Écris une fonction Python qui trie une liste de nombres en ordre croissant en utilisant le tri par insertion."
+
+# Créer la requête au modèle
+chat_completion = client.chat.completions.create(
+    messages=[
+        {"role": "user", "content": description}
+    ],
+    model="llama-3.3-70b-versatile",  # ou deepseek-coder:6.7b pour génération de code
+)
+
+# Afficher le code généré
+print("💡 Code généré à partir du commentaire :\n")
+print(chat_completion.choices[0].message.content)
+
